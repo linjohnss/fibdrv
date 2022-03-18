@@ -54,13 +54,25 @@ static int fib_release(struct inode *inode, struct file *file)
     return 0;
 }
 
+static ktime_t kt;
+
+static long long fib_time_proxy(long long k)
+{
+    kt = ktime_get();
+    long long result = fib_sequence(k);
+    kt = ktime_sub(ktime_get(), kt);
+
+    return result;
+}
+
 /* calculate the fibonacci number at given offset */
 static ssize_t fib_read(struct file *file,
                         char *buf,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    // return (ssize_t) fib_sequence(*offset);
+    return (ssize_t) fib_time_proxy(*offset);
 }
 
 /* write operation is skipped */
@@ -69,7 +81,8 @@ static ssize_t fib_write(struct file *file,
                          size_t size,
                          loff_t *offset)
 {
-    return 1;
+    return ktime_to_ns(kt);
+    // return 1;
 }
 
 static loff_t fib_device_lseek(struct file *file, loff_t offset, int orig)

@@ -27,6 +27,9 @@ unload:
 client: client.c
 	$(CC) -o $@ $^
 
+client_plot: client_plot.c
+	$(CC) -o $@ $^
+
 PRINTF = env printf
 PASS_COLOR = \e[32;01m
 NO_COLOR = \e[0m
