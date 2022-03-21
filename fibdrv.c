@@ -24,7 +24,7 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static long long fib_sequence(long long k)
+static long long fib_iterative(long long k)
 {
     if (k < 2)
         return k;
@@ -38,6 +38,34 @@ static long long fib_sequence(long long k)
     }
 
     return f[2];
+}
+
+static long long fib_fast_doubling(long long k)
+{
+    long long h = 0;
+    for (long long i = k; i; ++h, i >>= 1)
+        ;
+
+    long long a = 0;
+    long long b = 1;
+    for (unsigned int mask = 1 << (h - 1); mask; mask >>= 1) {
+        long long c = a * (2 * b - a);
+        long long d = a * a + b * b;
+
+        if (mask & k) {
+            a = d;
+            b = c + d;
+        } else {
+            a = c;
+            b = d;
+        }
+    }
+    return a;
+}
+
+static long long fib_sequence(long long k)
+{
+    return fib_fast_doubling(k);
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -72,7 +100,6 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    // return (ssize_t) fib_sequence(*offset);
     return (ssize_t) fib_time_proxy(*offset);
 }
 
@@ -82,10 +109,23 @@ static ssize_t fib_write(struct file *file,
                          size_t size,
                          loff_t *offset)
 {
-    if (size)
+    switch (size) {
+    case 0:
+        break;
+    case 1:
+        kt = ktime_get();
+        fib_iterative(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        break;
+    case 2:
+        kt = ktime_get();
+        fib_fast_doubling(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        break;
+    default:
         return 1;
-    else
-        return ktime_to_ns(kt);
+    }
+    return ktime_to_ns(kt);
 }
 
 static loff_t fib_device_lseek(struct file *file, loff_t offset, int orig)
