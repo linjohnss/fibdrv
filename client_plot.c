@@ -38,6 +38,17 @@ int main(int argc, char *argv[])
             time_fast_doubling = write(fd, buf, 2);
             printf("%d %lld %lld\n", i, time_interative, time_fast_doubling);
         }
+    } else if (argv[1][0] == '2') {  // fast_doubling_clz runnung time compare
+        for (int i = 0; i <= offset; i++) {
+            long long time_interative, time_fast_doubling,
+                time_fast_doubling_clz;
+            lseek(fd, i, SEEK_SET);
+            time_interative = write(fd, buf, 1);
+            time_fast_doubling = write(fd, buf, 2);
+            time_fast_doubling_clz = write(fd, buf, 3);
+            printf("%d %lld %lld %lld\n", i, time_interative,
+                   time_fast_doubling, time_fast_doubling_clz);
+        }
     }
     close(fd);
     return 0;

@@ -63,9 +63,30 @@ static long long fib_fast_doubling(long long k)
     return a;
 }
 
+static long long fib_fast_doubling_clz(long long k)
+{
+    long long h = 64 - __builtin_clzll(k);
+
+    long long a = 0;
+    long long b = 1;
+    for (unsigned int mask = 1 << (h - 1); mask; mask >>= 1) {
+        long long c = a * (2 * b - a);
+        long long d = a * a + b * b;
+
+        if (mask & k) {
+            a = d;
+            b = c + d;
+        } else {
+            a = c;
+            b = d;
+        }
+    }
+    return a;
+}
+
 static long long fib_sequence(long long k)
 {
-    return fib_fast_doubling(k);
+    return fib_fast_doubling_clz(k);
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -120,6 +141,11 @@ static ssize_t fib_write(struct file *file,
     case 2:
         kt = ktime_get();
         fib_fast_doubling(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        break;
+    case 3:
+        kt = ktime_get();
+        fib_fast_doubling_clz(*offset);
         kt = ktime_sub(ktime_get(), kt);
         break;
     default:
