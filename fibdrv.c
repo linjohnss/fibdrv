@@ -6,6 +6,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
+#include "bignum.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -17,12 +19,30 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 100
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
+
+static struct BigN fib_iterative_bign(long long k)
+{
+    struct BigN f[3];
+    f[0].lower = 0;
+    f[0].upper = 0;
+    f[1].lower = 1;
+    f[1].upper = 0;
+    if (k < 2)
+        return f[k];
+    for (int i = 2; i <= k; i++) {
+        addBigN(&f[2], f[0], f[1]);
+        f[0] = f[1];
+        f[1] = f[2];
+    }
+
+    return f[2];
+}
 
 static long long fib_iterative(long long k)
 {
@@ -84,11 +104,6 @@ static long long fib_fast_doubling_clz(long long k)
     return a;
 }
 
-static long long fib_sequence(long long k)
-{
-    return fib_fast_doubling_clz(k);
-}
-
 static int fib_open(struct inode *inode, struct file *file)
 {
     if (!mutex_trylock(&fib_mutex)) {
@@ -106,22 +121,40 @@ static int fib_release(struct inode *inode, struct file *file)
 
 static ktime_t kt;
 
-static long long fib_time_proxy(long long k)
-{
-    kt = ktime_get();
-    long long result = fib_sequence(k);
-    kt = ktime_sub(ktime_get(), kt);
-
-    return result;
-}
-
 /* calculate the fibonacci number at given offset */
 static ssize_t fib_read(struct file *file,
                         char *buf,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_time_proxy(*offset);
+    long long result = 0;
+    switch (size) {
+    case 0:
+        kt = ktime_get();
+        result = fib_iterative(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        break;
+    case 1:
+        kt = ktime_get();
+        result = fib_fast_doubling(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        break;
+    case 2:
+        kt = ktime_get();
+        result = fib_fast_doubling_clz(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        break;
+    case 3:
+        kt = ktime_get();
+        struct BigN result_bn = fib_iterative_bign(*offset);
+        kt = ktime_sub(ktime_get(), kt);
+        char *str = BigNtoDec(result_bn);
+        result = copy_to_user(buf, str, strlen(str) + 1);
+        break;
+    default:
+        return 1;
+    }
+    return result;
 }
 
 /* write operation is skipped */
