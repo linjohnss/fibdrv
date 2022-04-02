@@ -19,24 +19,22 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 100
+#define MAX_LENGTH 500
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static struct BigN fib_iterative_bign(long long k)
+static BigN fib_iterative_bign(long long k)
 {
-    struct BigN f[3];
-    f[0].lower = 0;
-    f[0].upper = 0;
-    f[1].lower = 1;
-    f[1].upper = 0;
+    BigN f[3];
+    init_BigN(&f[0], 0);
+    init_BigN(&f[1], 1);
     if (k < 2)
         return f[k];
     for (int i = 2; i <= k; i++) {
-        addBigN(&f[2], f[0], f[1]);
+        add_BigN(&f[0], &f[1], &f[2]);
         f[0] = f[1];
         f[1] = f[2];
     }
@@ -146,9 +144,9 @@ static ssize_t fib_read(struct file *file,
         break;
     case 3:
         kt = ktime_get();
-        struct BigN result_bn = fib_iterative_bign(*offset);
+        BigN result_bn = fib_iterative_bign(*offset);
+        char *str = result_BigN(&result_bn);
         kt = ktime_sub(ktime_get(), kt);
-        char *str = BigNtoDec(result_bn);
         result = copy_to_user(buf, str, strlen(str) + 1);
         break;
     default:

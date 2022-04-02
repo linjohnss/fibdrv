@@ -1,48 +1,49 @@
 #ifndef BIGNUM_H
 #define BIGNUM_H
 
-struct BigN {
-    unsigned long long lower, upper;
-};
+#define MAX_DIGITS 200
 
-static inline void addBigN(struct BigN *output, struct BigN x, struct BigN y)
+typedef struct {
+    char num[MAX_DIGITS]; /* represent the number */
+    int digit;            /* index of high-order digit */
+} BigN;
+
+static void init_BigN(BigN *n, long long input)
 {
-    output->upper = x.upper + y.upper;
-    if (y.lower > ~x.lower)
-        output->upper++;
-    output->lower = x.lower + y.lower;
+    for (int i = 0; i < MAX_DIGITS; i++)
+        n->num[i] = (char) 0;
+    n->digit = -1;
+    if (input == 0)
+        n->digit = 0;
+    for (; input > 0; input /= 10) {
+        n->digit++;
+        n->num[n->digit] = (input % 10);
+    }
 }
 
-static char *BigNtoDec(struct BigN target)
+static void add_BigN(BigN *a, BigN *b, BigN *c)
 {
-    // log10(x) = log2(x) / log2(10) ~= log2(x) / 3.322
-    size_t size = sizeof(struct BigN) * 8 / 3 + 2;
-    char *str = (char *) kmalloc(size + 1, GFP_KERNEL);
-    memset(str, '0', size);
-    str[size] = '\0';
-    int carry;
-    for (unsigned long long i = 1ULL << 63; i; i >>= 1) {
-        carry = (target.upper & i) > 0;
-        for (int j = size - 1; j >= 0; j--) {
-            str[j] += ((str[j] - '0') + carry);
-            carry = str[j] > '9';
-            if (carry)
-                str[j] -= 10;
-        }
+    int carry = 0;
+    init_BigN(c, 0);
+    c->digit = a->digit > b->digit ? a->digit + 1 : b->digit + 1;
+    for (int i = 0; i <= c->digit; i++) {
+        c->num[i] = (char) (carry + a->num[i] + b->num[i]) % 10;
+        carry = (carry + a->num[i] + b->num[i]) / 10;
     }
-    for (unsigned long long i = 1ULL << 63; i; i >>= 1) {
-        carry = (target.lower & i) > 0;
-        for (int j = size - 1; j >= 0; j--) {
-            str[j] += ((str[j] - '0') + carry);
-            carry = str[j] > '9';
-            if (carry)
-                str[j] -= 10;
-        }
+    if (c->num[c->digit] == 0)
+        c->digit--;
+}
+
+static char *result_BigN(BigN *result)
+{
+    size_t s = result->digit + 1;
+    char *str = (char *) kmalloc(MAX_DIGITS, GFP_KERNEL);
+    memset(str, '0', s);
+    str[s] = '\0';
+    for (int i = s - 1, j = 0; i > -1; i--, j++) {
+        str[i] += result->num[j];
     }
-    char *ptr = str;
-    for (; *ptr == '0' && ptr != &str[size - 1]; ptr++)
-        ;
-    return ptr;
+    return str;
 }
 
 #endif
